@@ -20,7 +20,7 @@ class EmbeddingProvider(str, Enum):
     """Supported embedding providers."""
 
     OPENAI = "openai"
-    # Future: add more providers
+    OLLAMA = "ollama"
 
 
 class Settings(BaseSettings):
@@ -59,14 +59,20 @@ class Settings(BaseSettings):
         description="Ollama model name",
     )
 
+    # Ollama Embedding Model
+    ollama_embedding_model: str = Field(
+        default="nomic-embed-text",
+        description="Ollama embedding model name",
+    )
+
     # Embedding Settings
     embedding_provider: EmbeddingProvider = Field(
-        default=EmbeddingProvider.OPENAI,
-        description="Embedding provider",
+        default=EmbeddingProvider.OLLAMA,
+        description="Embedding provider (openai or ollama)",
     )
     embedding_model: str = Field(
         default="text-embedding-3-small",
-        description="Embedding model name",
+        description="OpenAI embedding model name",
     )
 
     # ChromaDB Settings
@@ -108,6 +114,21 @@ class Settings(BaseSettings):
                 "provider": "ollama",
                 "base_url": self.ollama_base_url,
                 "model": self.ollama_model,
+            }
+
+    def get_embedding_config(self) -> dict:
+        """Get embedding configuration based on selected provider."""
+        if self.embedding_provider == EmbeddingProvider.OPENAI:
+            return {
+                "provider": "openai",
+                "api_key": self.openai_api_key,
+                "model": self.embedding_model,
+            }
+        else:  # OLLAMA
+            return {
+                "provider": "ollama",
+                "base_url": self.ollama_base_url,
+                "model": self.ollama_embedding_model,
             }
 
     def ensure_directories(self) -> None:
