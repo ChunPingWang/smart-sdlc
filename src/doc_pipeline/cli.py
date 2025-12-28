@@ -418,9 +418,13 @@ def check_terminology(
 
         console.print(issues_table)
 
-    # Export report
+    # Export reports
     report_path = checker.export_report(report, output_dir)
-    console.print(f"\n[green]Report saved to: {report_path}[/green]")
+    readable_path = checker.export_readable_report(report, output_dir)
+
+    console.print("\n[bold]Reports saved:[/bold]")
+    console.print(f"  [green]Technical:[/green] {report_path}")
+    console.print(f"  [green]Readable:[/green]  {readable_path}")
 
 
 if __name__ == "__main__":
