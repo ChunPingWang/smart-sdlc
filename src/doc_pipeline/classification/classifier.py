@@ -32,14 +32,45 @@ class LLMClient:
             from openai import OpenAI
 
             client = OpenAI(api_key=self.config["api_key"])
-            response = client.chat.completions.create(
-                model=self.config["model"],
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0,
+            model = self.config["model"]
+
+            # o1/o3/o4 系列推理模型不支援 temperature 和 system message
+            is_reasoning_model = any(
+                model.startswith(prefix) for prefix in ("o1", "o3", "o4")
             )
+
+            if is_reasoning_model:
+                # 推理模型：合併 prompt，不設定 temperature
+                combined_prompt = f"{system_prompt}\n\n{user_prompt}"
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "user", "content": combined_prompt},
+                    ],
+                )
+            else:
+                # 標準模型：使用 system message 和 temperature=0
+                try:
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        temperature=0,
+                    )
+                except Exception as temp_error:
+                    # 若 temperature 不支援，則不帶 temperature 重試
+                    if "temperature" in str(temp_error).lower():
+                        response = client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt},
+                            ],
+                        )
+                    else:
+                        raise
             return response.choices[0].message.content or ""
         except Exception as e:
             return f"Error: {e}"
