@@ -14,6 +14,7 @@
 | 文件分類 | ✅ LLM + 規則雙模式 |
 | 知識庫 | ✅ 向量儲存 + 語意搜尋 |
 | 規格產出 | ✅ 需求/API/DB/任務 |
+| 術語一致性檢查 | ✅ LLM 驅動的用語規範驗證 |
 | LLM 支援 | ✅ OpenAI / Anthropic / Ollama |
 | Embedding 支援 | ✅ OpenAI / Ollama (本地) |
 | 測試覆蓋 | ✅ 14 個測試通過 |
@@ -26,6 +27,7 @@
 - **向量語意搜尋**: 使用 Embedding 模型進行語意相似度搜尋
 - **知識庫**: 本地檔案式儲存，支援向量搜尋與關鍵字搜尋
 - **規格產出**: 自動產出需求清單、API 規格、DB Schema、開發任務
+- **術語一致性檢查**: 使用 LLM 比對字典檔，找出不符合規範的用語
 - **多種匯出**: YAML、OpenAPI 3.0、SQL DDL 格式輸出
 - **完全本地運行**: 使用 Ollama 可完全離線運行，無需 API Key
 
@@ -227,6 +229,20 @@ uv run doc-pipeline search "API 設計" --type api_specification --limit 10
 ```
 
 ```bash
+# 術語一致性檢查
+uv run doc-pipeline check-terms --glossary <字典檔> [選項]
+
+選項:
+  --glossary, -g  術語字典檔路徑 (YAML，必填)
+  --output, -o    報告輸出目錄 (預設: ./output)
+  --type, -t      只檢查特定類型文件
+
+# 範例
+uv run doc-pipeline check-terms -g ./glossary.yaml
+uv run doc-pipeline check-terms -g ./glossary.yaml --type api_specification
+```
+
+```bash
 # 其他命令
 uv run doc-pipeline info      # 顯示設定資訊
 uv run doc-pipeline clear-kb  # 清空知識庫
@@ -266,6 +282,120 @@ uv run doc-pipeline search "使用者身份驗證"
 # 傳統搜尋只會精確匹配
 uv run doc-pipeline search "使用者身份驗證" --no-semantic
 ```
+
+---
+
+## 術語一致性檢查
+
+使用 LLM 分析知識庫中的文件，找出不符合術語規範的用語，確保文件用詞一致性。
+
+### 工作原理
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  字典檔       │     │  文件 Chunk   │     │    LLM      │
+│  (YAML)      │────▶│  (知識庫)     │────▶│   分析比對   │
+└──────────────┘     └──────────────┘     └──────────────┘
+                                                 │
+                                                 ▼
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  YAML 報告   │◀────│  問題清單     │◀────│  一致性分數   │
+└──────────────┘     └──────────────┘     └──────────────┘
+```
+
+LLM 會根據字典檔中定義的「標準用語」與「替代詞」，掃描每個文件片段，找出使用了替代詞的地方並建議改用標準用語。
+
+### 字典檔格式
+
+字典檔使用 YAML 格式，定義標準用語與其替代詞：
+
+```yaml
+# glossary.yaml
+project_name: "專案名稱"
+
+terms:
+  - standard: "使用者"           # 標準用語
+    alternatives:               # 替代詞（視為不一致）
+      - "用戶"
+      - "用户"
+      - "User"
+    description: "系統的終端使用者"
+
+  - standard: "API"
+    alternatives:
+      - "api"
+      - "介面"
+      - "接口"
+    description: "應用程式介面"
+
+  - standard: "資料庫"
+    alternatives:
+      - "数据库"
+      - "Database"
+      - "DB"
+    description: "資料儲存系統"
+```
+
+### 使用範例
+
+```bash
+# 1. 先處理文件到知識庫
+uv run doc-pipeline process ./docs --no-generate
+
+# 2. 執行術語檢查
+uv run doc-pipeline check-terms --glossary ./glossary.yaml
+
+# 輸出範例：
+# ╭───────────────────────────────╮
+# │ Terminology Consistency Check │
+# ╰───────────────────────────────╯
+# Checking 8 document chunks...
+#
+# Check Summary:
+# ┌───────────────────┬─────┐
+# │ Documents checked │ 8   │
+# │ Issues found      │ 5   │
+# │ Consistency score │ 85% │
+# └───────────────────┴─────┘
+```
+
+### 輸出報告
+
+檢查完成後會產出 `terminology-report.yaml`：
+
+```yaml
+report:
+  generated_at: "2024-12-28T15:00:00"
+  glossary_file: "./glossary.yaml"
+  summary:
+    total_chunks: 8
+    issues_found: 5
+    consistency_score: 0.85
+
+issues:
+  - id: "TERM-001"
+    source_file: "api-design.md"
+    chunk_id: "chunk-abc123"
+    found_term: "用戶"
+    standard_term: "使用者"
+    context: "...用戶註冊API..."
+    severity: "warning"
+```
+
+### 使用場景
+
+| 場景 | 說明 |
+|------|------|
+| 文件審校 | 確保技術文件用詞統一 |
+| 多語言專案 | 統一繁體/簡體中文用語 |
+| 團隊規範 | 建立並維護術語標準 |
+| CI/CD 整合 | 自動化檢查文件品質 |
+
+### 提示
+
+- 使用較大的 LLM 模型（如 gpt-4o 或 claude）可獲得更準確的結果
+- 字典檔中的 `description` 欄位可幫助 LLM 更好地理解術語含義
+- 建議先從核心術語開始，逐步擴充字典檔
 
 ---
 
@@ -354,6 +484,10 @@ smart-sdlc/
 │   ├── knowledge_base/         # 知識庫
 │   │   ├── embeddings.py       # 向量嵌入服務
 │   │   └── vectorstore.py      # 向量儲存與搜尋
+│   ├── terminology/            # 術語檢查
+│   │   ├── models.py           # 資料模型
+│   │   ├── prompts.py          # LLM Prompt
+│   │   └── checker.py          # 檢查器
 │   ├── generation/             # 規格產出
 │   │   ├── generator.py        # 規格產生器
 │   │   ├── prompts/            # Prompt 模板
@@ -364,7 +498,8 @@ smart-sdlc/
 │   ├── test_parser.py
 │   └── test_chunker.py
 └── examples/                   # 範例
-    └── sample-docs/
+    ├── sample-docs/            # 範例文件
+    └── glossary.yaml           # 範例字典檔
 ```
 
 ---

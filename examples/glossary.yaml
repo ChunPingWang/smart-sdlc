@@ -1,0 +1,94 @@
+# 術語字典範例
+# Terminology Glossary Example
+#
+# 使用方式:
+# uv run doc-pipeline check-terms --glossary ./examples/glossary.yaml
+
+project_name: "範例專案"
+
+terms:
+  # 使用者相關術語
+  - standard: "使用者"
+    alternatives:
+      - "用戶"
+      - "用户"
+      - "User"
+      - "user"
+    description: "系統的終端使用者"
+
+  # API 相關術語
+  - standard: "API"
+    alternatives:
+      - "api"
+      - "介面"
+      - "接口"
+      - "界面"
+    description: "應用程式介面 (Application Programming Interface)"
+
+  # 資料庫相關術語
+  - standard: "資料庫"
+    alternatives:
+      - "数据库"
+      - "Database"
+      - "database"
+      - "DB"
+      - "db"
+    description: "資料儲存系統"
+
+  # 密碼相關術語
+  - standard: "密碼"
+    alternatives:
+      - "密码"
+      - "Password"
+      - "password"
+      - "pwd"
+    description: "使用者驗證憑證"
+
+  # 驗證相關術語
+  - standard: "驗證"
+    alternatives:
+      - "验证"
+      - "認證"
+      - "认证"
+      - "Authentication"
+      - "authentication"
+    description: "身份確認程序"
+
+  # 註冊相關術語
+  - standard: "註冊"
+    alternatives:
+      - "注册"
+      - "Register"
+      - "register"
+      - "signup"
+      - "Sign up"
+    description: "建立新帳號的程序"
+
+  # 登入相關術語
+  - standard: "登入"
+    alternatives:
+      - "登录"
+      - "Login"
+      - "login"
+      - "signin"
+      - "Sign in"
+    description: "使用者進入系統的程序"
+
+  # 需求相關術語
+  - standard: "需求"
+    alternatives:
+      - "需要"
+      - "Requirement"
+      - "requirement"
+      - "req"
+    description: "系統功能或特性的規格說明"
+
+  # 規格相關術語
+  - standard: "規格"
+    alternatives:
+      - "规格"
+      - "Spec"
+      - "spec"
+      - "Specification"
+      - "specification"
+    description: "詳細的技術說明文件"

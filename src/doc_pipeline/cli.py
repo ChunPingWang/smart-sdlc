@@ -322,5 +322,106 @@ def clear_kb() -> None:
         console.print("[yellow]Cancelled[/yellow]")
 
 
+@app.command("check-terms")
+def check_terminology(
+    glossary: Path = typer.Option(
+        ...,
+        "--glossary",
+        "-g",
+        help="Path to terminology glossary file (YAML)",
+        exists=True,
+    ),
+    output_dir: Path = typer.Option(
+        Path("./output"),
+        "--output",
+        "-o",
+        help="Output directory for the report",
+    ),
+    type_filter: Optional[str] = typer.Option(
+        None,
+        "--type",
+        "-t",
+        help="Filter by chunk type (e.g., api_specification)",
+    ),
+) -> None:
+    """Check document terminology consistency against a glossary."""
+    console.print(
+        Panel.fit("[bold blue]Terminology Consistency Check[/bold blue]")
+    )
+
+    from doc_pipeline.document.models import ChunkType
+    from doc_pipeline.knowledge_base import KnowledgeBase
+    from doc_pipeline.terminology import TerminologyChecker
+
+    # Load chunks from knowledge base
+    kb = KnowledgeBase()
+
+    if type_filter:
+        try:
+            chunk_type = ChunkType(type_filter)
+            chunks = kb.get_by_type(chunk_type)
+        except ValueError:
+            console.print(f"[red]Unknown type: {type_filter}[/red]")
+            raise typer.Exit(1)
+    else:
+        chunks = kb.get_all()
+
+    if not chunks:
+        console.print("[yellow]No documents found in knowledge base.[/yellow]")
+        console.print("Run 'doc-pipeline process' first to add documents.")
+        raise typer.Exit(1)
+
+    console.print(f"Checking {len(chunks)} document chunks...")
+
+    # Run terminology check
+    try:
+        checker = TerminologyChecker(glossary)
+        report = checker.check_all(chunks)
+    except FileNotFoundError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+    # Display summary
+    console.print("\n[bold]Check Summary:[/bold]")
+    summary_table = Table(show_header=False)
+    summary_table.add_column("Metric", style="cyan")
+    summary_table.add_column("Value", style="green")
+
+    summary_table.add_row("Documents checked", str(report.summary["total_chunks"]))
+    summary_table.add_row("Issues found", str(report.summary["issues_found"]))
+    score_pct = int(report.summary["consistency_score"] * 100)
+    score_color = "green" if score_pct >= 80 else "yellow" if score_pct >= 60 else "red"
+    summary_table.add_row("Consistency score", f"[{score_color}]{score_pct}%[/{score_color}]")
+
+    console.print(summary_table)
+
+    # Display issues if any
+    if report.issues:
+        console.print("\n[bold]Issues Found:[/bold]")
+        issues_table = Table()
+        issues_table.add_column("Source", style="cyan")
+        issues_table.add_column("Found", style="red")
+        issues_table.add_column("Should Be", style="green")
+        issues_table.add_column("Context", style="dim")
+
+        for issue in report.issues:
+            # Truncate source file name
+            source = Path(issue.source_file).name
+            # Truncate context
+            context = issue.context[:40] + "..." if len(issue.context) > 40 else issue.context
+            issues_table.add_row(
+                source,
+                issue.found_term,
+                issue.standard_term,
+                context,
+            )
+
+        console.print(issues_table)
+
+    # Export report
+    report_path = checker.export_report(report, output_dir)
+    console.print(f"\n[green]Report saved to: {report_path}[/green]")
+
+
 if __name__ == "__main__":
     app()
