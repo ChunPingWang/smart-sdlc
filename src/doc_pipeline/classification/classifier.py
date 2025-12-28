@@ -10,7 +10,7 @@ from doc_pipeline.document.models import ChunkType, DocumentChunk
 
 
 class LLMClient:
-    """Simple LLM client wrapper for OpenAI and Anthropic."""
+    """Simple LLM client wrapper for OpenAI, Anthropic, and Ollama."""
 
     def __init__(self):
         """Initialize based on settings."""
@@ -21,8 +21,10 @@ class LLMClient:
         """Complete a prompt using the configured LLM."""
         if self.provider == "openai":
             return self._openai_complete(system_prompt, user_prompt)
-        else:
+        elif self.provider == "anthropic":
             return self._anthropic_complete(system_prompt, user_prompt)
+        else:  # ollama
+            return self._ollama_complete(system_prompt, user_prompt)
 
     def _openai_complete(self, system_prompt: str, user_prompt: str) -> str:
         """Use OpenAI API."""
@@ -55,6 +57,38 @@ class LLMClient:
                 messages=[{"role": "user", "content": user_prompt}],
             )
             return response.content[0].text if response.content else ""
+        except Exception as e:
+            return f"Error: {e}"
+
+    def _ollama_complete(self, system_prompt: str, user_prompt: str) -> str:
+        """Use Ollama API."""
+        try:
+            import urllib.request
+            import urllib.error
+
+            url = f"{self.config['base_url']}/api/chat"
+            payload = {
+                "model": self.config["model"],
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "stream": False,
+            }
+
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+
+            with urllib.request.urlopen(req, timeout=120) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                return result.get("message", {}).get("content", "")
+        except urllib.error.URLError as e:
+            return f"Error: Ollama connection failed - {e.reason}. Is Ollama running?"
         except Exception as e:
             return f"Error: {e}"
 

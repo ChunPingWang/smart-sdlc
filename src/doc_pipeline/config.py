@@ -13,6 +13,7 @@ class LLMProvider(str, Enum):
 
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    OLLAMA = "ollama"
 
 
 class EmbeddingProvider(str, Enum):
@@ -46,6 +47,16 @@ class Settings(BaseSettings):
     anthropic_model: str = Field(
         default="claude-3-5-sonnet-20241022",
         description="Anthropic model name",
+    )
+
+    # Ollama Configuration
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        description="Ollama API base URL",
+    )
+    ollama_model: str = Field(
+        default="llama3.2",
+        description="Ollama model name",
     )
 
     # Embedding Settings
@@ -86,11 +97,17 @@ class Settings(BaseSettings):
                 "api_key": self.openai_api_key,
                 "model": self.openai_model,
             }
-        else:
+        elif self.llm_provider == LLMProvider.ANTHROPIC:
             return {
                 "provider": "anthropic",
                 "api_key": self.anthropic_api_key,
                 "model": self.anthropic_model,
+            }
+        else:  # OLLAMA
+            return {
+                "provider": "ollama",
+                "base_url": self.ollama_base_url,
+                "model": self.ollama_model,
             }
 
     def ensure_directories(self) -> None:

@@ -283,7 +283,15 @@ def info() -> None:
 
     table.add_row("Version", __version__)
     table.add_row("LLM Provider", settings.llm_provider.value)
-    table.add_row("LLM Model", settings.openai_model if settings.llm_provider.value == "openai" else settings.anthropic_model)
+
+    # Show model based on provider
+    if settings.llm_provider.value == "openai":
+        llm_model = settings.openai_model
+    elif settings.llm_provider.value == "anthropic":
+        llm_model = settings.anthropic_model
+    else:  # ollama
+        llm_model = f"{settings.ollama_model} @ {settings.ollama_base_url}"
+    table.add_row("LLM Model", llm_model)
     table.add_row("Embedding Model", settings.embedding_model)
     table.add_row("Chunk Size", str(settings.chunk_size))
     table.add_row("Output Directory", str(settings.output_dir))
