@@ -18,7 +18,7 @@
 | 術語一致性檢查 | ✅ LLM 驅動的用語規範驗證 |
 | LLM 支援 | ✅ OpenAI / Anthropic / Ollama |
 | Embedding 支援 | ✅ OpenAI / Ollama (本地) |
-| 測試覆蓋 | ✅ 14 個測試通過 |
+| 測試覆蓋 | ✅ 45 個測試通過 |
 
 ## 功能特色
 
