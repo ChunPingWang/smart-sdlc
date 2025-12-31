@@ -546,262 +546,264 @@ def contains_ddl_keywords(content: str) -> bool:
     return any(keyword.lower() in content_lower for keyword in DDL_KEYWORDS)
 
 
-def extract_table_definitions(markdown_content: str) -> list[dict[str, Any]]:
+def generate_ddl_from_markdown(markdown_content: str, table_name: str | None = None) -> str:
     """
-    Extract table definitions from Markdown content.
+    Generate DDL SQL from Markdown content.
 
-    Returns list of table definitions with columns and types.
+    Supports FSD (Functional Specification Document) table format:
+    - Row with "資料表名稱(英)" contains the table name
+    - Row with "欄位名稱(中)" and "欄位名稱(英)" is the header
+    - Following rows are column definitions
+
+    Args:
+        markdown_content: Markdown content containing table definitions
+        table_name: Optional fallback table name
+
+    Returns:
+        DDL SQL statements
     """
-    tables = []
     lines = markdown_content.split("\n")
-    current_table_name = None
-    current_columns = []
-    in_table = False
 
-    for i, line in enumerate(lines):
+    # Try to extract FSD format table
+    result = _extract_fsd_table(lines, table_name)
+
+    if result:
+        return result
+
+    return ""
+
+
+def _extract_fsd_table(lines: list[str], fallback_name: str | None = None) -> str:
+    """
+    Extract table definition from FSD (Functional Specification Document) format.
+
+    FSD Format:
+    |  | 資料表名稱(中) | 個簽優惠資料檔 | ... |
+    | --- | --- | --- | ... |
+    |  | 資料表名稱(英) | CUST_PREFERENTIAL_MST | ... |
+    |  | 欄位名稱(中) | 欄位名稱(英) | 欄位型別 | 長度 | PK | UK | 必填 | 預設值 | 說明 |
+    |  | 流水號 | ID | INTEGER | 30 | Y |  |  |  | 系統生成的流水號 |
+    """
+    table_name = None
+    columns: list[dict[str, Any]] = []
+    in_column_section = False
+    header_indices: dict[str, int] = {}
+
+    for line in lines:
         line = line.strip()
+        if not line.startswith("|") or "---" in line:
+            continue
 
-        # Look for table name in headers or text
-        if line.startswith("#"):
-            header_text = re.sub(r"^#+\s*", "", line)
-            # Check if header contains table-related keywords
-            if any(kw in header_text.lower() for kw in ["table", "資料表", "數據表"]):
-                # Extract table name
-                match = re.search(r"[:\s]([A-Za-z_][A-Za-z0-9_]*)", header_text)
-                if match:
-                    if current_table_name and current_columns:
-                        tables.append({
-                            "name": current_table_name,
-                            "columns": current_columns
-                        })
-                    current_table_name = match.group(1)
-                    current_columns = []
-                    in_table = False
+        cells = [c.strip() for c in line.split("|")]
+        # Remove empty first and last cells from split
+        if cells and cells[0] == "":
+            cells = cells[1:]
+        if cells and cells[-1] == "":
+            cells = cells[:-1]
 
-        # Detect markdown table start
-        if line.startswith("|") and "---" not in line:
-            cells = [c.strip() for c in line.split("|")[1:-1]]
-            if len(cells) >= 2:
-                # Check if this looks like a column definition row
-                # Common patterns: 欄位名稱, Column Name, Field, 資料型別, Type, etc.
-                first_cell_lower = cells[0].lower() if cells else ""
+        if len(cells) < 3:
+            continue
 
-                if in_table:
-                    # This is a data row in an existing table
-                    if len(cells) >= 2:
-                        col_info = _parse_column_row(cells)
-                        if col_info:
-                            current_columns.append(col_info)
-                else:
-                    # Check if this is a header row for column definitions
-                    header_keywords = ["欄位", "column", "field", "名稱", "name", "型別", "type"]
-                    if any(kw in first_cell_lower for kw in header_keywords):
-                        in_table = True
+        # Check for table name row: "資料表名稱(英)"
+        if "資料表名稱(英)" in cells[1] or "資料表名稱（英）" in cells[1]:
+            # Table name is in the next cell
+            potential_name = cells[2].strip()
+            if potential_name and re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', potential_name):
+                table_name = potential_name
+            continue
 
-        elif line.startswith("|") and "---" in line:
-            # Separator line, continue
-            pass
-        elif not line.startswith("|") and in_table:
-            # End of table
-            in_table = False
+        # Check for column header row
+        if ("欄位名稱(中)" in cells[1] or "欄位名稱（中）" in cells[1]) and \
+           ("欄位名稱(英)" in cells[2] or "欄位名稱（英）" in cells[2]):
+            in_column_section = True
+            # Map header positions
+            for i, cell in enumerate(cells):
+                cell_lower = cell.lower().replace("（", "(").replace("）", ")")
+                if "欄位名稱(英)" in cell or "column" in cell_lower:
+                    header_indices["column_name"] = i
+                elif "欄位型別" in cell or "type" in cell_lower:
+                    header_indices["column_type"] = i
+                elif "長度" in cell or "length" in cell_lower:
+                    header_indices["length"] = i
+                elif cell.upper() == "PK" or "primary" in cell_lower:
+                    header_indices["pk"] = i
+                elif cell.upper() == "UK" or "unique" in cell_lower:
+                    header_indices["uk"] = i
+                elif "必填" in cell or "required" in cell_lower or "not null" in cell_lower:
+                    header_indices["required"] = i
+                elif "說明" in cell or "description" in cell_lower or "comment" in cell_lower:
+                    header_indices["comment"] = i
+            continue
 
-    # Don't forget the last table
-    if current_table_name and current_columns:
-        tables.append({
-            "name": current_table_name,
-            "columns": current_columns
-        })
+        # Parse column definition row
+        if in_column_section and len(cells) >= 4:
+            col_info = _parse_fsd_column_row(cells, header_indices)
+            if col_info:
+                columns.append(col_info)
 
-    return tables
+    # Generate DDL if we have valid data
+    if not columns:
+        return ""
+
+    # Use fallback name if no table name found
+    if not table_name:
+        if fallback_name:
+            # Extract English table name from fallback if possible
+            match = re.search(r'([A-Z][A-Z0-9_]+)', fallback_name)
+            if match:
+                table_name = match.group(1)
+            else:
+                table_name = re.sub(r'[^\w]', '_', fallback_name)
+        else:
+            return ""
+
+    # Build DDL
+    ddl_lines = [
+        f"-- Auto-generated DDL from FSD document",
+        f"-- Table: {table_name}",
+        "",
+        f"CREATE TABLE {table_name} ("
+    ]
+
+    col_defs = []
+    for col in columns:
+        col_def = f"    {col['name']} {col['type']}"
+        if col.get("constraints"):
+            col_def += " " + " ".join(col["constraints"])
+        if col.get("comment"):
+            # Escape comment for SQL
+            comment = col["comment"].replace("'", "''").replace("\n", " ")
+            col_def += f"  -- {comment}"
+        col_defs.append(col_def)
+
+    ddl_lines.append(",\n".join(col_defs))
+    ddl_lines.append(");")
+    ddl_lines.append("")
+
+    return "\n".join(ddl_lines)
 
 
-def _parse_column_row(cells: list[str]) -> dict[str, str] | None:
-    """Parse a table row as a column definition."""
-    if len(cells) < 2:
+def _parse_fsd_column_row(cells: list[str], header_indices: dict[str, int]) -> dict[str, Any] | None:
+    """Parse a column definition row from FSD format."""
+    # Get column name (English)
+    col_name_idx = header_indices.get("column_name", 2)
+    if col_name_idx >= len(cells):
         return None
 
-    # Try to identify column name and type
-    col_name = cells[0].strip()
-    col_type = cells[1].strip() if len(cells) > 1 else "VARCHAR(255)"
+    col_name = cells[col_name_idx].strip()
 
-    # Skip if looks like a header row
-    if col_name.lower() in ["欄位", "column", "field", "名稱", "name", ""]:
+    # Skip if empty or looks like a header
+    if not col_name or col_name.lower() in ["欄位名稱(英)", "column", "field", ""]:
         return None
 
-    # Clean column name
-    col_name = re.sub(r"[^\w]", "_", col_name)
-    if not col_name or col_name[0].isdigit():
+    # Validate column name (must be valid SQL identifier)
+    if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', col_name):
         return None
 
-    # Map common type names to SQL types
-    type_mapping = {
-        "string": "VARCHAR(255)",
-        "字串": "VARCHAR(255)",
-        "text": "TEXT",
-        "文字": "TEXT",
-        "int": "INTEGER",
-        "integer": "INTEGER",
-        "整數": "INTEGER",
-        "number": "DECIMAL(18,2)",
-        "數字": "DECIMAL(18,2)",
-        "decimal": "DECIMAL(18,2)",
-        "float": "FLOAT",
-        "double": "DOUBLE",
-        "date": "DATE",
-        "日期": "DATE",
-        "datetime": "DATETIME",
-        "時間": "DATETIME",
-        "timestamp": "TIMESTAMP",
-        "boolean": "BOOLEAN",
-        "bool": "BOOLEAN",
-        "布林": "BOOLEAN",
-    }
+    # Get column type
+    col_type_idx = header_indices.get("column_type", 3)
+    raw_type = cells[col_type_idx].strip().upper() if col_type_idx < len(cells) else "VARCHAR"
 
-    col_type_lower = col_type.lower()
-    for key, sql_type in type_mapping.items():
-        if key in col_type_lower:
-            col_type = sql_type
-            break
+    # Get length
+    length_idx = header_indices.get("length", 4)
+    length = cells[length_idx].strip() if length_idx < len(cells) else ""
 
-    # Check for constraints
+    # Build SQL type
+    col_type = _build_sql_type(raw_type, length)
+
+    # Get constraints
     constraints = []
-    full_text = " ".join(cells).lower()
-    if "primary" in full_text or "pk" in full_text or "主鍵" in full_text:
-        constraints.append("PRIMARY KEY")
-    if "not null" in full_text or "必填" in full_text or "required" in full_text:
-        constraints.append("NOT NULL")
-    if "unique" in full_text or "唯一" in full_text:
-        constraints.append("UNIQUE")
+
+    # Check PK
+    pk_idx = header_indices.get("pk", 5)
+    if pk_idx < len(cells):
+        pk_value = cells[pk_idx].strip().upper()
+        if pk_value in ["Y", "V", "YES", "TRUE", "1", "○", "●"]:
+            constraints.append("PRIMARY KEY")
+
+    # Check UK (Unique Key)
+    uk_idx = header_indices.get("uk", 6)
+    if uk_idx < len(cells):
+        uk_value = cells[uk_idx].strip().upper()
+        if uk_value in ["Y", "V", "YES", "TRUE", "1", "○", "●"]:
+            constraints.append("UNIQUE")
+
+    # Check Required (NOT NULL)
+    req_idx = header_indices.get("required", 7)
+    if req_idx < len(cells):
+        req_value = cells[req_idx].strip().upper()
+        if req_value in ["Y", "V", "YES", "TRUE", "1", "○", "●"]:
+            constraints.append("NOT NULL")
+
+    # Get comment
+    comment_idx = header_indices.get("comment", -1)
+    comment = ""
+    if comment_idx > 0 and comment_idx < len(cells):
+        comment = cells[comment_idx].strip()
+    elif len(cells) > 8:
+        # Last cell is often the comment
+        comment = cells[-1].strip()
 
     return {
         "name": col_name,
         "type": col_type,
         "constraints": constraints,
-        "comment": cells[-1] if len(cells) > 2 else "",
+        "comment": comment,
     }
 
 
-def generate_ddl_from_markdown(markdown_content: str, table_name: str | None = None) -> str:
-    """
-    Generate DDL SQL from Markdown content.
+def _build_sql_type(raw_type: str, length: str) -> str:
+    """Build SQL type with length specification."""
+    raw_type = raw_type.upper().strip()
+    length = length.strip()
 
-    Args:
-        markdown_content: Markdown content containing table definitions
-        table_name: Optional override for table name
+    # Type mapping
+    type_map = {
+        "VARCHAR": "VARCHAR",
+        "VARCHAR2": "VARCHAR",
+        "CHAR": "CHAR",
+        "NVARCHAR": "NVARCHAR",
+        "NVARCHAR2": "NVARCHAR",
+        "TEXT": "TEXT",
+        "CLOB": "TEXT",
+        "INTEGER": "INTEGER",
+        "INT": "INTEGER",
+        "BIGINT": "BIGINT",
+        "SMALLINT": "SMALLINT",
+        "NUMBER": "DECIMAL",
+        "NUMERIC": "DECIMAL",
+        "DECIMAL": "DECIMAL",
+        "FLOAT": "FLOAT",
+        "DOUBLE": "DOUBLE",
+        "REAL": "REAL",
+        "DATE": "DATE",
+        "DATETIME": "DATETIME",
+        "TIMESTAMP": "TIMESTAMP",
+        "TIME": "TIME",
+        "BOOLEAN": "BOOLEAN",
+        "BOOL": "BOOLEAN",
+        "BLOB": "BLOB",
+        "BINARY": "BINARY",
+    }
 
-    Returns:
-        DDL SQL statements
-    """
-    tables = extract_table_definitions(markdown_content)
+    sql_type = type_map.get(raw_type, "VARCHAR")
 
-    if not tables:
-        # Try to generate a simple DDL from any markdown table found
-        tables = _extract_simple_tables(markdown_content, table_name)
+    # Add length for types that need it
+    if sql_type in ["VARCHAR", "NVARCHAR", "CHAR"] and length:
+        try:
+            length_int = int(length)
+            return f"{sql_type}({length_int})"
+        except ValueError:
+            return f"{sql_type}(255)"
+    elif sql_type == "DECIMAL" and length:
+        # Handle precision,scale format
+        if "," in length:
+            return f"DECIMAL({length})"
+        else:
+            try:
+                precision = int(length)
+                return f"DECIMAL({precision},2)"
+            except ValueError:
+                return "DECIMAL(18,2)"
 
-    if not tables:
-        return ""
-
-    ddl_statements = []
-    ddl_statements.append("-- Auto-generated DDL from document conversion")
-    ddl_statements.append(f"-- Source: {table_name or 'unknown'}")
-    ddl_statements.append("")
-
-    for table in tables:
-        tbl_name = table["name"]
-        columns = table["columns"]
-
-        if not columns:
-            continue
-
-        ddl_statements.append(f"CREATE TABLE {tbl_name} (")
-
-        col_defs = []
-        for col in columns:
-            col_def = f"    {col['name']} {col['type']}"
-            if col.get("constraints"):
-                col_def += " " + " ".join(col["constraints"])
-            if col.get("comment"):
-                col_def += f"  -- {col['comment']}"
-            col_defs.append(col_def)
-
-        ddl_statements.append(",\n".join(col_defs))
-        ddl_statements.append(");")
-        ddl_statements.append("")
-
-    return "\n".join(ddl_statements)
-
-
-def _extract_simple_tables(markdown_content: str, default_name: str | None = None) -> list[dict]:
-    """Extract table structure from any markdown table."""
-    tables = []
-    lines = markdown_content.split("\n")
-
-    current_headers: list[str] = []
-    current_rows: list[list[str]] = []
-    table_count = 0
-
-    for line in lines:
-        line = line.strip()
-
-        if line.startswith("|") and "---" not in line:
-            cells = [c.strip() for c in line.split("|")[1:-1]]
-            if not current_headers:
-                current_headers = cells
-            else:
-                current_rows.append(cells)
-
-        elif line.startswith("|") and "---" in line:
-            continue
-
-        elif not line.startswith("|") and current_headers:
-            # End of table
-            if current_headers and current_rows:
-                table_count += 1
-                name = default_name or f"table_{table_count}"
-                name = re.sub(r"[^\w]", "_", name)
-
-                columns = []
-                for i, header in enumerate(current_headers):
-                    col_name = re.sub(r"[^\w]", "_", header) or f"col_{i}"
-                    # Infer type from first row data
-                    sample = current_rows[0][i] if i < len(current_rows[0]) else ""
-                    col_type = _infer_sql_type(sample)
-                    columns.append({
-                        "name": col_name,
-                        "type": col_type,
-                        "constraints": [],
-                        "comment": header,
-                    })
-
-                tables.append({"name": name, "columns": columns})
-
-            current_headers = []
-            current_rows = []
-
-    return tables
-
-
-def _infer_sql_type(sample: str) -> str:
-    """Infer SQL type from sample data."""
-    if not sample:
-        return "VARCHAR(255)"
-
-    sample = sample.strip()
-
-    # Check for numbers
-    if re.match(r"^-?\d+$", sample):
-        return "INTEGER"
-    if re.match(r"^-?\d+\.\d+$", sample):
-        return "DECIMAL(18,2)"
-
-    # Check for dates
-    if re.match(r"^\d{4}[-/]\d{2}[-/]\d{2}", sample):
-        return "DATE"
-
-    # Check for boolean
-    if sample.lower() in ["true", "false", "yes", "no", "是", "否", "y", "n"]:
-        return "BOOLEAN"
-
-    # Default to varchar with reasonable length
-    length = max(255, len(sample) * 2)
-    return f"VARCHAR({min(length, 4000)})"
+    return sql_type
