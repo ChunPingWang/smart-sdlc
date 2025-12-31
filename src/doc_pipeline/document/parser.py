@@ -257,3 +257,147 @@ def parse_directory(
     """Convenience function to parse a directory."""
     parser = DocumentParser()
     return parser.parse_directory(directory, recursive)
+
+
+def convert_to_markdown(file_path: str | Path) -> str:
+    """
+    Convert a document file directly to Markdown format without any modification.
+
+    Args:
+        file_path: Path to the document file
+
+    Returns:
+        Markdown string representation of the document
+    """
+    parser = DocumentParser()
+    file_path = Path(file_path)
+    parser._validate_file(file_path)
+
+    ext = file_path.suffix.lower()
+
+    if ext in {".md", ".markdown", ".txt"}:
+        # Already markdown/text, return as-is
+        return file_path.read_text(encoding="utf-8")
+    elif ext == ".docx":
+        return _docx_to_markdown(file_path)
+    elif ext == ".xlsx":
+        return _xlsx_to_markdown(file_path)
+    elif ext == ".pdf":
+        return _pdf_to_markdown(file_path)
+    else:
+        raise ValueError(f"Unsupported file type: {ext}")
+
+
+def _docx_to_markdown(file_path: Path) -> str:
+    """Convert Word document to Markdown."""
+    try:
+        from docx import Document
+    except ImportError:
+        raise ImportError("python-docx not installed. Run: pip install python-docx")
+
+    doc = Document(str(file_path))
+    lines = []
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            lines.append("")
+            continue
+
+        style = para.style.name if para.style else ""
+
+        if "Heading 1" in style or "Title" in style:
+            lines.append(f"# {text}")
+        elif "Heading 2" in style:
+            lines.append(f"## {text}")
+        elif "Heading 3" in style:
+            lines.append(f"### {text}")
+        elif "Heading 4" in style:
+            lines.append(f"#### {text}")
+        elif "Heading" in style:
+            lines.append(f"## {text}")
+        else:
+            lines.append(text)
+
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _xlsx_to_markdown(file_path: Path) -> str:
+    """Convert Excel file to Markdown tables."""
+    import warnings
+
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        raise ImportError("openpyxl not installed. Run: pip install openpyxl")
+
+    lines = []
+
+    # Suppress Data Validation warning for all Excel operations
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning)
+        wb = load_workbook(file_path, read_only=True, data_only=True)
+
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            lines.append(f"# {sheet_name}")
+            lines.append("")
+
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
+                continue
+
+            # Filter out completely empty rows
+            non_empty_rows = [row for row in rows if any(cell is not None for cell in row)]
+            if not non_empty_rows:
+                continue
+
+            # Determine max columns
+            max_cols = max(len(row) for row in non_empty_rows)
+
+            # Create table header from first row
+            header_row = non_empty_rows[0]
+            header_cells = [str(cell) if cell is not None else "" for cell in header_row]
+            # Pad to max_cols
+            header_cells.extend([""] * (max_cols - len(header_cells)))
+
+            lines.append("| " + " | ".join(header_cells) + " |")
+            lines.append("| " + " | ".join(["---"] * max_cols) + " |")
+
+            # Data rows
+            for row in non_empty_rows[1:]:
+                cells = [str(cell) if cell is not None else "" for cell in row]
+                cells.extend([""] * (max_cols - len(cells)))
+                lines.append("| " + " | ".join(cells) + " |")
+
+            lines.append("")
+
+    return "\n".join(lines)
+
+
+def _pdf_to_markdown(file_path: Path) -> str:
+    """Convert PDF to Markdown."""
+    try:
+        import pdfplumber
+    except ImportError:
+        raise ImportError("pdfplumber not installed. Run: pip install pdfplumber")
+
+    lines = []
+
+    with pdfplumber.open(file_path) as pdf:
+        for i, page in enumerate(pdf.pages):
+            if i > 0:
+                lines.append("")
+                lines.append("---")
+                lines.append("")
+
+            lines.append(f"## Page {i + 1}")
+            lines.append("")
+
+            text = page.extract_text()
+            if text:
+                lines.append(text)
+
+    return "\n".join(lines)

@@ -304,6 +304,83 @@ def search(
 
 
 @app.command()
+def convert(
+    input_dir: Path = typer.Argument(
+        ...,
+        help="Directory containing input documents",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    output_dir: Path = typer.Option(
+        Path("./output"),
+        "--output",
+        "-o",
+        help="Output directory for converted files",
+    ),
+    recursive: bool = typer.Option(
+        True,
+        "--recursive/--no-recursive",
+        "-r/-R",
+        help="Search directories recursively",
+    ),
+) -> None:
+    """Convert documents to Markdown format (1:1 conversion, no modification)."""
+    console.print(
+        Panel.fit(
+            f"[bold blue]Converting documents from {input_dir}[/bold blue]"
+        )
+    )
+
+    from doc_pipeline.document.parser import DocumentParser, convert_to_markdown
+
+    parser = DocumentParser()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Find all supported files
+    pattern = "**/*" if recursive else "*"
+    converted_files = []
+    errors = []
+
+    for file_path in input_dir.glob(pattern):
+        if file_path.suffix.lower() in parser.SUPPORTED_EXTENSIONS:
+            try:
+                # Convert to markdown
+                md_content = convert_to_markdown(file_path)
+
+                # Create output path preserving directory structure
+                relative_path = file_path.relative_to(input_dir)
+                output_path = output_dir / relative_path.with_suffix(".md")
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Write markdown file
+                output_path.write_text(md_content, encoding="utf-8")
+                converted_files.append((file_path, output_path))
+                console.print(f"  [green]✓[/green] {file_path.name} → {output_path.name}")
+
+            except Exception as e:
+                errors.append((file_path, str(e)))
+                console.print(f"  [red]✗[/red] {file_path.name}: {e}")
+
+    # Summary
+    console.print()
+    table = Table(show_header=False)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="green")
+
+    table.add_row("Files converted", str(len(converted_files)))
+    table.add_row("Errors", str(len(errors)))
+    table.add_row("Output directory", str(output_dir))
+
+    console.print(table)
+
+    if converted_files:
+        console.print("\n[bold]Converted files:[/bold]")
+        for src, dst in converted_files:
+            console.print(f"  [green]{dst}[/green]")
+
+
+@app.command()
 def info() -> None:
     """Show configuration and status information."""
     console.print(Panel.fit("[bold blue]Doc-Pipeline Configuration[/bold blue]"))
