@@ -14,7 +14,12 @@ from doc_pipeline.config import settings
 from doc_pipeline.document import DocumentParser, ParsedDocument
 from doc_pipeline.document.models import DocumentChunk
 from doc_pipeline.generation import SpecificationGenerator
-from doc_pipeline.generation.exporters import OpenAPIExporter, SQLExporter, YAMLExporter
+from doc_pipeline.generation.exporters import (
+    MarkdownExporter,
+    OpenAPIExporter,
+    SQLExporter,
+    YAMLExporter,
+)
 from doc_pipeline.knowledge_base import KnowledgeBase
 
 console = Console()
@@ -232,6 +237,12 @@ class PipelineOrchestrator:
         yaml_exporter = YAMLExporter(self.output_dir)
         yaml_files = yaml_exporter.export_all(specs)
         exported.update(yaml_files)
+
+        # Markdown export (requirements, API spec, dev tasks)
+        md_exporter = MarkdownExporter(self.output_dir)
+        md_files = md_exporter.export_all(specs)
+        for key, path in md_files.items():
+            exported[f"{key}_md"] = path
 
         # OpenAPI export
         if specs.get("api_specifications"):

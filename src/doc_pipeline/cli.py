@@ -175,6 +175,11 @@ def generate(
         "-o",
         help="Output directory",
     ),
+    format_type: str = typer.Option(
+        "all",
+        "--format",
+        help="Output format: yaml, markdown, all",
+    ),
 ) -> None:
     """Generate specific specification types."""
     console.print(f"[blue]Generating {spec_type} specifications...[/blue]")
@@ -223,13 +228,39 @@ def generate(
         console.print(f"[red]Unknown spec type: {spec_type}[/red]")
         raise typer.Exit(1)
 
-    # Export
-    from doc_pipeline.generation.exporters import YAMLExporter
+    # Export based on format
+    from doc_pipeline.generation.exporters import MarkdownExporter, YAMLExporter
 
-    exporter = YAMLExporter(output_dir)
-    output_path = exporter._write_yaml(specs, f"{spec_type}-spec.yaml")
+    output_paths = []
 
-    console.print(f"[green]Generated: {output_path}[/green]")
+    # YAML export
+    if format_type in ("yaml", "all"):
+        yaml_exporter = YAMLExporter(output_dir)
+        yaml_path = yaml_exporter._write_yaml(specs, f"{spec_type}-spec.yaml")
+        output_paths.append(yaml_path)
+
+    # Markdown export (except for db)
+    if format_type in ("markdown", "all") and spec_type != "db":
+        md_exporter = MarkdownExporter(output_dir)
+        if spec_type == "requirements":
+            md_path = md_exporter.export_requirements(specs)
+        elif spec_type == "api":
+            md_path = md_exporter.export_api_spec({"api_specifications": specs.get("api_specifications", [])})
+        elif spec_type == "tasks":
+            md_path = md_exporter.export_dev_tasks(specs)
+        elif spec_type == "all":
+            md_files = md_exporter.export_all(specs)
+            output_paths.extend(md_files.values())
+            md_path = None
+        else:
+            md_path = None
+
+        if md_path:
+            output_paths.append(md_path)
+
+    console.print("\n[bold]Generated files:[/bold]")
+    for path in output_paths:
+        console.print(f"  [green]{path}[/green]")
 
 
 @app.command()
