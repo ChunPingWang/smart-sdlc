@@ -5,7 +5,7 @@ import re
 from typing import Any
 
 from doc_pipeline.classification.taxonomy import TAXONOMY, get_classification_prompt
-from doc_pipeline.config import LLMProvider, settings
+from doc_pipeline.config import settings
 from doc_pipeline.document.models import ChunkType, DocumentChunk
 
 
@@ -94,8 +94,8 @@ class LLMClient:
     def _ollama_complete(self, system_prompt: str, user_prompt: str) -> str:
         """Use Ollama API."""
         try:
-            import urllib.request
             import urllib.error
+            import urllib.request
 
             url = f"{self.config['base_url']}/api/chat"
             payload = {

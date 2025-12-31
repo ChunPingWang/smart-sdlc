@@ -23,7 +23,7 @@ TAXONOMY: dict[ChunkType, ChunkTypeInfo] = {
         type=ChunkType.BUSINESS_RULE,
         name="Business Rule",
         name_zh="業務規則",
-        description="Validation rules, calculation logic, or decision rules for business operations",
+        description="Validation rules, calculation logic, or decision rules",
         keywords=[
             "must", "should", "validate", "verify", "check",
             "必須", "應該", "驗證", "檢查", "規則",

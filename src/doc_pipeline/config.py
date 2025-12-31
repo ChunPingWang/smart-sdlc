@@ -2,7 +2,6 @@
 
 from enum import Enum
 from pathlib import Path
-from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict

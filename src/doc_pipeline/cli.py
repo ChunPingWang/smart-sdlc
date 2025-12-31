@@ -1,7 +1,6 @@
 """Command-line interface for doc-pipeline."""
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -189,8 +188,8 @@ def generate(
 
     # Get chunks
     if input_dir:
-        from doc_pipeline.document import DocumentParser
         from doc_pipeline.chunking import SmartChunker
+        from doc_pipeline.document import DocumentParser
 
         parser = DocumentParser()
         chunker = SmartChunker()
@@ -245,7 +244,8 @@ def generate(
         if spec_type == "requirements":
             md_path = md_exporter.export_requirements(specs)
         elif spec_type == "api":
-            md_path = md_exporter.export_api_spec({"api_specifications": specs.get("api_specifications", [])})
+            api_specs = specs.get("api_specifications", [])
+            md_path = md_exporter.export_api_spec({"api_specifications": api_specs})
         elif spec_type == "tasks":
             md_path = md_exporter.export_dev_tasks(specs)
         elif spec_type == "all":
@@ -267,7 +267,7 @@ def generate(
 def search(
     query: str = typer.Argument(..., help="Search query"),
     limit: int = typer.Option(5, "--limit", "-l", help="Maximum results"),
-    type_filter: Optional[str] = typer.Option(
+    type_filter: str | None = typer.Option(
         None,
         "--type",
         "-t",
@@ -368,7 +368,7 @@ def check_terminology(
         "-o",
         help="Output directory for the report",
     ),
-    type_filter: Optional[str] = typer.Option(
+    type_filter: str | None = typer.Option(
         None,
         "--type",
         "-t",

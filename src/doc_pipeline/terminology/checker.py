@@ -59,7 +59,7 @@ class TerminologyChecker:
         if not path.exists():
             raise FileNotFoundError(f"Glossary file not found: {path}")
 
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         if not data:
@@ -348,7 +348,8 @@ class TerminologyChecker:
                 ])
 
                 for issue in file_issues:
-                    context = issue.context[:30] + "..." if len(issue.context) > 30 else issue.context
+                    ctx = issue.context
+                    context = ctx[:30] + "..." if len(ctx) > 30 else ctx
                     # Escape pipe characters in context
                     context = context.replace("|", "\\|")
                     lines.append(

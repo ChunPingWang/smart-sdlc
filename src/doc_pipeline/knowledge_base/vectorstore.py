@@ -59,9 +59,9 @@ class KnowledgeBase:
         """Load existing data from file."""
         if self._data_file.exists():
             try:
-                with open(self._data_file, "r", encoding="utf-8") as f:
+                with open(self._data_file, encoding="utf-8") as f:
                     self._chunks = json.load(f)
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 self._chunks = []
 
     def _save(self) -> None:
@@ -84,7 +84,10 @@ class KnowledgeBase:
         Returns:
             List of added document IDs
         """
-        should_embed = compute_embeddings if compute_embeddings is not None else self._use_embeddings
+        if compute_embeddings is not None:
+            should_embed = compute_embeddings
+        else:
+            should_embed = self._use_embeddings
         ids = []
 
         # Prepare contents for batch embedding

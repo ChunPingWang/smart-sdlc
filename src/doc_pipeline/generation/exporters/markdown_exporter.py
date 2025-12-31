@@ -166,8 +166,9 @@ class MarkdownExporter:
 
     def _format_nfr(self, nfr: dict) -> list[str]:
         """Format a single non-functional requirement."""
+        title = nfr.get("title", nfr.get("requirement", "未命名")[:30])
         lines = [
-            f"### {nfr.get('id', 'N/A')}: {nfr.get('title', nfr.get('requirement', '未命名')[:30])}",
+            f"### {nfr.get('id', 'N/A')}: {title}",
             "",
             f"**類別**: `{nfr.get('category', 'N/A')}`",
             "",

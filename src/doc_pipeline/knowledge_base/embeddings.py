@@ -5,10 +5,10 @@ import urllib.error
 import urllib.request
 from typing import Protocol
 
-from doc_pipeline.config import EmbeddingProvider, settings
+from doc_pipeline.config import settings
 
 
-class EmbeddingProvider_(Protocol):
+class EmbeddingProviderProtocol(Protocol):
     """Protocol for embedding providers."""
 
     def embed_text(self, text: str) -> list[float]:
