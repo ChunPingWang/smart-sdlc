@@ -1,5 +1,11 @@
 # Doc-Pipeline
 
+![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)
+![Ruff](https://img.shields.io/badge/Ruff-passing-brightgreen?logo=ruff&logoColor=white)
+![Mypy](https://img.shields.io/badge/Mypy-passing-brightgreen?logo=python&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-45%20passed-brightgreen?logo=pytest&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow?logo=opensourceinitiative&logoColor=white)
+
 **Document-to-Code Pipeline** - AI 驅動的文件處理與規格產出系統
 
 將原始系統設計文件（Word、Excel、Markdown、PDF）轉換為 AI 可處理的結構化規格。
