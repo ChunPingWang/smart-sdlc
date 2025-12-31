@@ -324,43 +324,152 @@ def convert(
         "-r/-R",
         help="Search directories recursively",
     ),
+    use_docling: bool = typer.Option(
+        False,
+        "--use-docling",
+        help="Use Docling AI-powered conversion for better accuracy",
+    ),
+    generate_ddl: bool = typer.Option(
+        True,
+        "--ddl/--no-ddl",
+        help="Generate DDL SQL files for database-related content",
+    ),
 ) -> None:
-    """Convert documents to Markdown format (1:1 conversion, no modification)."""
+    """Convert documents to Markdown format (1:1 conversion, no modification).
+
+    Features:
+    - Word (.docx): Preserves heading hierarchy (H1-H9), lists, tables
+    - Excel (.xlsx): Each sheet outputs as separate file (filename_sheetname.md)
+    - PDF: Page-by-page conversion
+    - DDL: Auto-generates .sql files when database/table keywords detected
+
+    Use --use-docling for AI-powered conversion with better accuracy (requires docling package).
+    """
     console.print(
         Panel.fit(
             f"[bold blue]Converting documents from {input_dir}[/bold blue]"
         )
     )
 
-    from doc_pipeline.document.parser import DocumentParser, convert_to_markdown
+    from doc_pipeline.document.parser import (
+        DocumentParser,
+        _docx_to_markdown,
+        _pdf_to_markdown,
+        _xlsx_to_markdown_sheets,
+        contains_ddl_keywords,
+        convert_to_markdown,
+        generate_ddl_from_markdown,
+    )
 
     parser = DocumentParser()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Find all supported files
     pattern = "**/*" if recursive else "*"
-    converted_files = []
-    errors = []
+    converted_files: list[tuple[Path, Path]] = []
+    ddl_files: list[Path] = []
+    errors: list[tuple[Path, str]] = []
 
     for file_path in input_dir.glob(pattern):
-        if file_path.suffix.lower() in parser.SUPPORTED_EXTENSIONS:
-            try:
-                # Convert to markdown
-                md_content = convert_to_markdown(file_path)
+        if file_path.suffix.lower() not in parser.SUPPORTED_EXTENSIONS:
+            continue
 
-                # Create output path preserving directory structure
-                relative_path = file_path.relative_to(input_dir)
+        try:
+            ext = file_path.suffix.lower()
+            relative_path = file_path.relative_to(input_dir)
+            base_name = file_path.stem
+
+            # Handle Excel files: each sheet as separate file
+            if ext == ".xlsx":
+                if use_docling:
+                    # Docling converts entire file
+                    md_content = convert_to_markdown(file_path, use_docling=True)
+                    output_path = output_dir / relative_path.with_suffix(".md")
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    output_path.write_text(md_content, encoding="utf-8")
+                    converted_files.append((file_path, output_path))
+                    console.print(f"  [green]✓[/green] {file_path.name} → {output_path.name}")
+
+                    # Check for DDL keywords
+                    if generate_ddl and contains_ddl_keywords(md_content):
+                        ddl_content = generate_ddl_from_markdown(md_content, base_name)
+                        if ddl_content:
+                            ddl_path = output_dir / relative_path.with_suffix(".sql")
+                            ddl_path.write_text(ddl_content, encoding="utf-8")
+                            ddl_files.append(ddl_path)
+                            console.print(f"  [cyan]📊[/cyan] {file_path.name} → {ddl_path.name} (DDL)")
+                else:
+                    # Convert each sheet separately
+                    sheets = _xlsx_to_markdown_sheets(file_path)
+                    for sheet_name, md_content in sheets.items():
+                        # Clean sheet name for filename
+                        safe_sheet_name = "".join(
+                            c if c.isalnum() or c in "-_ " else "_" for c in sheet_name
+                        ).strip()
+                        output_name = f"{base_name}_{safe_sheet_name}.md"
+                        output_path = output_dir / relative_path.parent / output_name
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                        output_path.write_text(md_content, encoding="utf-8")
+                        converted_files.append((file_path, output_path))
+                        console.print(f"  [green]✓[/green] {file_path.name} [{sheet_name}] → {output_name}")
+
+                        # Check for DDL keywords in each sheet
+                        if generate_ddl and contains_ddl_keywords(md_content):
+                            ddl_content = generate_ddl_from_markdown(md_content, f"{base_name}_{safe_sheet_name}")
+                            if ddl_content:
+                                ddl_name = f"{base_name}_{safe_sheet_name}.sql"
+                                ddl_path = output_dir / relative_path.parent / ddl_name
+                                ddl_path.write_text(ddl_content, encoding="utf-8")
+                                ddl_files.append(ddl_path)
+                                console.print(f"  [cyan]📊[/cyan] {file_path.name} [{sheet_name}] → {ddl_name} (DDL)")
+
+            # Handle Word files
+            elif ext == ".docx":
+                if use_docling:
+                    md_content = convert_to_markdown(file_path, use_docling=True)
+                else:
+                    md_content = _docx_to_markdown(file_path)
+
                 output_path = output_dir / relative_path.with_suffix(".md")
                 output_path.parent.mkdir(parents=True, exist_ok=True)
-
-                # Write markdown file
                 output_path.write_text(md_content, encoding="utf-8")
                 converted_files.append((file_path, output_path))
                 console.print(f"  [green]✓[/green] {file_path.name} → {output_path.name}")
 
-            except Exception as e:
-                errors.append((file_path, str(e)))
-                console.print(f"  [red]✗[/red] {file_path.name}: {e}")
+                # Check for DDL keywords
+                if generate_ddl and contains_ddl_keywords(md_content):
+                    ddl_content = generate_ddl_from_markdown(md_content, base_name)
+                    if ddl_content:
+                        ddl_path = output_dir / relative_path.with_suffix(".sql")
+                        ddl_path.write_text(ddl_content, encoding="utf-8")
+                        ddl_files.append(ddl_path)
+                        console.print(f"  [cyan]📊[/cyan] {file_path.name} → {ddl_path.name} (DDL)")
+
+            # Handle PDF files
+            elif ext == ".pdf":
+                if use_docling:
+                    md_content = convert_to_markdown(file_path, use_docling=True)
+                else:
+                    md_content = _pdf_to_markdown(file_path)
+
+                output_path = output_dir / relative_path.with_suffix(".md")
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_text(md_content, encoding="utf-8")
+                converted_files.append((file_path, output_path))
+                console.print(f"  [green]✓[/green] {file_path.name} → {output_path.name}")
+
+            # Handle Markdown/Text files (copy as-is)
+            elif ext in {".md", ".markdown", ".txt"}:
+                md_content = file_path.read_text(encoding="utf-8")
+                output_path = output_dir / relative_path.with_suffix(".md")
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_text(md_content, encoding="utf-8")
+                converted_files.append((file_path, output_path))
+                console.print(f"  [green]✓[/green] {file_path.name} → {output_path.name}")
+
+        except Exception as e:
+            errors.append((file_path, str(e)))
+            console.print(f"  [red]✗[/red] {file_path.name}: {e}")
 
     # Summary
     console.print()
@@ -369,6 +478,7 @@ def convert(
     table.add_column("Value", style="green")
 
     table.add_row("Files converted", str(len(converted_files)))
+    table.add_row("DDL files generated", str(len(ddl_files)))
     table.add_row("Errors", str(len(errors)))
     table.add_row("Output directory", str(output_dir))
 
@@ -378,6 +488,11 @@ def convert(
         console.print("\n[bold]Converted files:[/bold]")
         for src, dst in converted_files:
             console.print(f"  [green]{dst}[/green]")
+
+    if ddl_files:
+        console.print("\n[bold]DDL files:[/bold]")
+        for ddl_path in ddl_files:
+            console.print(f"  [cyan]{ddl_path}[/cyan]")
 
 
 @app.command()
