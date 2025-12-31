@@ -14,6 +14,7 @@
 | 文件分類 | ✅ LLM + 規則雙模式 |
 | 知識庫 | ✅ 向量儲存 + 語意搜尋 |
 | 規格產出 | ✅ 需求/API/DB/任務 |
+| 多格式輸出 | ✅ YAML + Markdown 雙格式 |
 | 術語一致性檢查 | ✅ LLM 驅動的用語規範驗證 |
 | LLM 支援 | ✅ OpenAI / Anthropic / Ollama |
 | Embedding 支援 | ✅ OpenAI / Ollama (本地) |
@@ -28,7 +29,7 @@
 - **知識庫**: 本地檔案式儲存，支援向量搜尋與關鍵字搜尋
 - **規格產出**: 自動產出需求清單、API 規格、DB Schema、開發任務
 - **術語一致性檢查**: 使用 LLM 比對字典檔，找出不符合規範的用語
-- **多種匯出**: YAML、OpenAPI 3.0、SQL DDL 格式輸出
+- **多種匯出**: YAML、Markdown、OpenAPI 3.0、SQL DDL 格式輸出
 - **完全本地運行**: 使用 Ollama 可完全離線運行，無需 API Key
 
 ## 安裝
@@ -209,10 +210,16 @@ uv run doc-pipeline generate <類型> [選項]
 
 類型: requirements, api, db, tasks, all
 
+選項:
+  --from, -f      文件目錄（未指定則使用知識庫）
+  --output, -o    輸出目錄 (預設: ./output)
+  --format        輸出格式: yaml, markdown, all (預設: all)
+
 # 範例
 uv run doc-pipeline generate requirements
 uv run doc-pipeline generate api --from ./docs
-uv run doc-pipeline generate all
+uv run doc-pipeline generate all --format markdown  # 只產出 Markdown
+uv run doc-pipeline generate tasks --format yaml    # 只產出 YAML
 ```
 
 ```bash
@@ -464,7 +471,7 @@ issues:
 | Embedding | 計算向量嵌入 | 768 維向量 |
 | Store | 儲存至知識庫供後續查詢 | JSON + 向量索引 |
 | Generate | LLM 產出結構化規格 | YAML 規格檔 |
-| Export | 轉換為各種格式輸出 | OpenAPI/SQL/YAML |
+| Export | 轉換為各種格式輸出 | YAML/Markdown/OpenAPI/SQL |
 
 ---
 
@@ -475,13 +482,55 @@ issues:
 ```
 output/
 ├── requirements-list.yaml  # 需求清單 (BR, FR, BRule, NFR)
+├── requirements-list.md    # 需求清單 Markdown 格式
 ├── api-spec.yaml           # API 規格
+├── api-spec.md             # API 規格 Markdown 格式
 ├── database-spec.yaml      # 資料庫規格
 ├── dev-tasks.yaml          # 開發任務清單 (Epic/Story/Task)
+├── dev-tasks.md            # 開發任務 Markdown 格式
 ├── all-specs.yaml          # 合併所有規格
 ├── openapi.yaml            # OpenAPI 3.0 文件 (若有 API)
 ├── schema.sql              # DDL 資料庫腳本 (若有 DB)
 └── ai-ready-specs/         # AI 工具可直接使用的規格
+```
+
+### Markdown 格式說明
+
+Markdown 格式的規格檔適合人工閱讀與文件分享：
+
+| 檔案 | 內容 |
+|------|------|
+| `requirements-list.md` | 📌 業務需求、⚙️ 功能需求、📏 業務規則、🛡️ 非功能需求、📊 統計表 |
+| `api-spec.md` | 📑 API 總覽表、📤 Request/📥 Response 格式、🔐 安全性設定 |
+| `dev-tasks.md` | 🎯 Epics、📖 User Stories、✅ Tasks with Checklist、📊 時數統計 |
+
+**範例：需求清單 Markdown**
+
+```markdown
+# 📋 需求規格清單
+
+## 📌 業務需求 (Business Requirements)
+
+### BR-001: 用戶註冊功能
+
+**優先級**: `P0`
+**來源**: 系統設計文件 第2章
+
+> 系統需提供用戶自助註冊功能
+
+**驗收條件**:
+- [ ] 用戶可透過 Email 註冊
+- [ ] 註冊後需 Email 驗證
+
+---
+
+## 📊 需求統計
+
+| 類型 | 數量 |
+|------|------|
+| 業務需求 (BR) | 3 |
+| 功能需求 (FR) | 8 |
+| **總計** | **11** |
 ```
 
 ## 文件分類類型
