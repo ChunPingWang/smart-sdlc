@@ -78,7 +78,7 @@ class MarkdownExporter:
 
         return self._write_markdown(lines, filename)
 
-    def _format_business_requirement(self, br: dict) -> list[str]:
+    def _format_business_requirement(self, br: dict[str, Any]) -> list[str]:
         """Format a single business requirement."""
         lines = [
             f"### {br.get('id', 'N/A')}: {br.get('title', '未命名')}",
@@ -101,7 +101,7 @@ class MarkdownExporter:
         lines.append("")
         return lines
 
-    def _format_functional_requirement(self, fr: dict) -> list[str]:
+    def _format_functional_requirement(self, fr: dict[str, Any]) -> list[str]:
         """Format a single functional requirement."""
         lines = [
             f"### {fr.get('id', 'N/A')}: {fr.get('title', fr.get('description', '未命名')[:30])}",
@@ -141,7 +141,7 @@ class MarkdownExporter:
         lines.append("")
         return lines
 
-    def _format_business_rule(self, brule: dict) -> list[str]:
+    def _format_business_rule(self, brule: dict[str, Any]) -> list[str]:
         """Format a single business rule."""
         lines = [
             f"### {brule.get('id', 'N/A')}: {brule.get('title', '未命名')}",
@@ -164,7 +164,7 @@ class MarkdownExporter:
         lines.append("")
         return lines
 
-    def _format_nfr(self, nfr: dict) -> list[str]:
+    def _format_nfr(self, nfr: dict[str, Any]) -> list[str]:
         """Format a single non-functional requirement."""
         title = nfr.get("title", nfr.get("requirement", "未命名")[:30])
         lines = [
@@ -182,7 +182,7 @@ class MarkdownExporter:
         lines.append("")
         return lines
 
-    def _format_requirements_summary(self, data: dict) -> list[str]:
+    def _format_requirements_summary(self, data: dict[str, Any]) -> list[str]:
         """Format requirements summary table."""
         brs = len(data.get("business_requirements", []))
         frs = len(data.get("functional_requirements", []))
@@ -260,7 +260,7 @@ class MarkdownExporter:
         }
         return badges.get(method.upper(), method)
 
-    def _format_api(self, api: dict) -> list[str]:
+    def _format_api(self, api: dict[str, Any]) -> list[str]:
         """Format a single API specification."""
         api_id = api.get("id", "N/A")
         name = api.get("name", "未命名")
@@ -311,7 +311,7 @@ class MarkdownExporter:
         lines.append("")
         return lines
 
-    def _format_request(self, request: dict) -> list[str]:
+    def _format_request(self, request: dict[str, Any]) -> list[str]:
         """Format API request specification."""
         lines = [
             "#### 📤 Request",
@@ -345,7 +345,7 @@ class MarkdownExporter:
 
         return lines
 
-    def _format_response(self, response: dict) -> list[str]:
+    def _format_response(self, response: dict[str, Any]) -> list[str]:
         """Format API response specification."""
         lines = [
             "#### 📥 Response",
@@ -433,7 +433,7 @@ class MarkdownExporter:
 
         return self._write_markdown(lines, filename)
 
-    def _format_epic(self, epic: dict) -> list[str]:
+    def _format_epic(self, epic: dict[str, Any]) -> list[str]:
         """Format a single epic."""
         lines = [
             f"### {epic.get('id', 'N/A')}: {epic.get('title', '未命名')}",
@@ -453,7 +453,7 @@ class MarkdownExporter:
         lines.append("")
         return lines
 
-    def _format_story(self, story: dict) -> list[str]:
+    def _format_story(self, story: dict[str, Any]) -> list[str]:
         """Format a single user story."""
         lines = [
             f"### {story.get('id', 'N/A')}: {story.get('title', '未命名')}",
@@ -488,7 +488,7 @@ class MarkdownExporter:
         lines.append("")
         return lines
 
-    def _format_task(self, task: dict) -> list[str]:
+    def _format_task(self, task: dict[str, Any]) -> list[str]:
         """Format a single development task."""
         task_id = task.get("id", "N/A")
         title = task.get("title", "未命名")
@@ -564,7 +564,7 @@ class MarkdownExporter:
         lines.append("")
         return lines
 
-    def _format_tasks_summary(self, data: dict) -> list[str]:
+    def _format_tasks_summary(self, data: dict[str, Any]) -> list[str]:
         """Format tasks summary."""
         epics = len(data.get("epics", []))
         stories = len(data.get("stories", []))
