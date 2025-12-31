@@ -107,7 +107,8 @@ class OllamaEmbedding:
 
             with urllib.request.urlopen(req, timeout=120) as response:
                 result = json.loads(response.read().decode("utf-8"))
-                return result.get("embeddings", [[] for _ in texts])
+                embeddings: list[list[float]] = result.get("embeddings", [[] for _ in texts])
+                return embeddings
         except urllib.error.URLError as e:
             print(f"Ollama embedding error: {e.reason}. Is Ollama running?")
             return [[] for _ in texts]
@@ -186,10 +187,11 @@ class EmbeddingService:
     - OpenAI (cloud)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize embedding service based on settings."""
         self.config = settings.get_embedding_config()
         self.provider_name = self.config["provider"]
+        self.provider: OllamaEmbedding | OpenAIEmbedding
 
         if self.provider_name == "ollama":
             self.provider = OllamaEmbedding(

@@ -182,7 +182,7 @@ class PipelineOrchestrator:
         if stage not in stages:
             raise ValueError(f"Unknown stage: {stage}")
 
-        return stages[stage](input_data)
+        return stages[stage](input_data)  # type: ignore[operator]
 
     def _ingest(self, input_dir: Path) -> list[ParsedDocument]:
         """Ingest documents from directory."""

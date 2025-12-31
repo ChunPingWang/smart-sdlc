@@ -164,7 +164,7 @@ class SmartChunker:
 
         return result
 
-    def _detect_best_strategy(self, content: str) -> str:
+    def _detect_best_strategy(self, content: str) -> Literal["structural", "semantic", "hybrid"]:
         """
         Detect the best chunking strategy for content.
 

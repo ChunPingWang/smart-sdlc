@@ -2,6 +2,7 @@
 
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -94,7 +95,7 @@ class Settings(BaseSettings):
         description="Output directory for generated specs",
     )
 
-    def get_llm_config(self) -> dict:
+    def get_llm_config(self) -> dict[str, Any]:
         """Get LLM configuration based on selected provider."""
         if self.llm_provider == LLMProvider.OPENAI:
             return {
@@ -115,7 +116,7 @@ class Settings(BaseSettings):
                 "model": self.ollama_model,
             }
 
-    def get_embedding_config(self) -> dict:
+    def get_embedding_config(self) -> dict[str, Any]:
         """Get embedding configuration based on selected provider."""
         if self.embedding_provider == EmbeddingProvider.OPENAI:
             return {

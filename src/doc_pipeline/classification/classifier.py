@@ -12,7 +12,7 @@ from doc_pipeline.document.models import ChunkType, DocumentChunk
 class LLMClient:
     """Simple LLM client wrapper for OpenAI, Anthropic, and Ollama."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize based on settings."""
         self.config = settings.get_llm_config()
         self.provider = self.config["provider"]
@@ -87,7 +87,9 @@ class LLMClient:
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
             )
-            return response.content[0].text if response.content else ""
+            if response.content and hasattr(response.content[0], "text"):
+                return str(response.content[0].text)
+            return ""
         except Exception as e:
             return f"Error: {e}"
 
@@ -117,7 +119,8 @@ class LLMClient:
 
             with urllib.request.urlopen(req, timeout=120) as response:
                 result = json.loads(response.read().decode("utf-8"))
-                return result.get("message", {}).get("content", "")
+                content: str = result.get("message", {}).get("content", "")
+                return content
         except urllib.error.URLError as e:
             return f"Error: Ollama connection failed - {e.reason}. Is Ollama running?"
         except Exception as e:

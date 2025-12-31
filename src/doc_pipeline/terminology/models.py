@@ -1,5 +1,7 @@
 """Data models for terminology consistency checking."""
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -40,7 +42,7 @@ class TerminologyReport(BaseModel):
 
     generated_at: str = Field(description="Report generation timestamp")
     glossary_file: str = Field(description="Path to the glossary file used")
-    summary: dict = Field(description="Summary statistics")
+    summary: dict[str, Any] = Field(description="Summary statistics")
     issues: list[TerminologyIssue] = Field(
         default_factory=list, description="List of found issues"
     )

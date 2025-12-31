@@ -307,9 +307,9 @@ class AIReadySpecGenerator:
 
     def _generate_test_cases(
         self,
-        feature: dict,
-        requirements: dict,
-    ) -> list[dict]:
+        feature: dict[str, Any],
+        requirements: dict[str, Any],
+    ) -> list[dict[str, Any]]:
         """Generate test case templates."""
         test_cases = []
 
@@ -335,7 +335,7 @@ class AIReadySpecGenerator:
 
         return test_cases
 
-    def _generate_impl_guide(self) -> dict:
+    def _generate_impl_guide(self) -> dict[str, Any]:
         """Generate implementation guide template."""
         return {
             "architecture": "hexagonal",

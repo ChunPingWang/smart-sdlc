@@ -62,8 +62,8 @@ class StructuralStrategy(ChunkingStrategy):
         """Split content based on markdown headers."""
         lines = content.split("\n")
         chunks = []
-        current_chunk_lines = []
-        current_headers = {}
+        current_chunk_lines: list[str] = []
+        current_headers: dict[str, str] = {}
 
         for line in lines:
             # Check if line is a header

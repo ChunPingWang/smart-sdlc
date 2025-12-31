@@ -59,7 +59,7 @@ class OpenAPIExporter:
         version: str,
     ) -> dict[str, Any]:
         """Build OpenAPI 3.0 document structure."""
-        doc = {
+        doc: dict[str, Any] = {
             "openapi": "3.0.3",
             "info": {
                 "title": title,
@@ -82,17 +82,20 @@ class OpenAPIExporter:
             },
         }
 
+        paths: dict[str, Any] = doc["paths"]
+        schemas: dict[str, Any] = doc["components"]["schemas"]
+
         for spec in api_specs:
             path = spec.get("path", "/")
             method = spec.get("method", "get").lower()
 
-            if path not in doc["paths"]:
-                doc["paths"][path] = {}
+            if path not in paths:
+                paths[path] = {}
 
-            doc["paths"][path][method] = self._build_operation(spec)
+            paths[path][method] = self._build_operation(spec)
 
             # Add schemas from request/response
-            self._extract_schemas(spec, doc["components"]["schemas"])
+            self._extract_schemas(spec, schemas)
 
         return doc
 

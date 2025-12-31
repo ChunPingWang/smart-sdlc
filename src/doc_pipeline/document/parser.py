@@ -98,7 +98,7 @@ class DocumentParser:
         except ImportError:
             return [{"type": "Error", "text": "python-docx not installed"}]
 
-        doc = Document(file_path)
+        doc = Document(str(file_path))
         elements = []
 
         for para in doc.paragraphs:
